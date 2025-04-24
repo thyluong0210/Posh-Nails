@@ -1,0 +1,433 @@
+import tkinter as tk
+from tkinter import messagebox
+from datetime import datetime, timedelta
+
+# Sample data
+SERVICES = {
+    'Manicure': 20,
+    'Pedicure': 25,
+    'Gel Manicure': 30,
+    'Matte Color': 15,
+    'Gel Color': 18
+}
+TECHNICIANS = ['Elyn', 'Maria', 'Sam']
+GOOGLE_ACCOUNTS = ['user1@gmail.com', 'user2@gmail.com', 'user3@gmail.com']
+
+class PoshNailsApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Posh Nails Appointment Booking")
+        self.geometry("500x500")
+        
+        # Dictionary to store session data
+        self.data = {}
+        
+        # Create a container for all frames
+        container = tk.Frame(self)
+        container.pack(side="top", fill="both", expand=True)
+        
+        # Dictionary to hold all page frames
+        self.frames = {}
+        for F in (SigninPage, GoogleSigninPage, AppleSigninPage, ServicesPage,
+                  AppointmentPage, CheckoutPage, PaymentPage, ConfirmationPage):
+            page_name = F.__name__
+            frame = F(parent=container, controller=self)
+            self.frames[page_name] = frame
+            
+            # Place all pages in the same location; the one on the top is visible.
+            frame.grid(row=0, column=0, sticky="nsew")
+        
+        self.show_frame("SigninPage")
+    
+    def show_frame(self, page_name):
+        """Raise the frame to the top for display"""
+        frame = self.frames[page_name]
+        frame.tkraise()
+
+class SigninPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        
+        tk.Label(self, text="Sign In", font=("Helvetica", 16)).pack(pady=10)
+        
+        tk.Label(self, text="Email:").pack(pady=5)
+        self.email_entry = tk.Entry(self, width=40)
+        self.email_entry.pack(pady=5)
+        
+        tk.Button(self, text="Continue", command=self.sign_in).pack(pady=5)
+        
+        # Buttons for third-party sign in
+        tk.Button(self, text="Continue with Google", 
+                  command=lambda: controller.show_frame("GoogleSigninPage")).pack(pady=5)
+        tk.Button(self, text="Continue with Apple",
+                  command=lambda: controller.show_frame("AppleSigninPage")).pack(pady=5)
+    
+    def sign_in(self):
+        email = self.email_entry.get().strip()
+        if not email:
+            messagebox.showerror("Error", "Email address is required.")
+            return
+        if "@" not in email:
+            messagebox.showerror("Error", "Please enter a valid email address.")
+            return
+        self.controller.data["email"] = email
+        self.controller.show_frame("ServicesPage")
+
+class GoogleSigninPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        tk.Label(self, text="Google Sign In", font=("Helvetica", 16)).pack(pady=10)
+        
+        tk.Label(self, text="Select your Google Account:").pack(pady=5)
+        
+        self.selected_account = tk.StringVar(self)
+        self.selected_account.set(GOOGLE_ACCOUNTS[0])
+        
+        option_menu = tk.OptionMenu(self, self.selected_account, *GOOGLE_ACCOUNTS)
+        option_menu.pack(pady=5)
+        
+        tk.Button(self, text="Continue", command=self.choose_account).pack(pady=5)
+    
+    def choose_account(self):
+        account = self.selected_account.get()
+        if not account:
+            messagebox.showerror("Error", "Please select a Google account.")
+            return
+        self.controller.data["email"] = account
+        self.controller.show_frame("ServicesPage")
+
+class AppleSigninPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        tk.Label(self, text="Apple Sign In", font=("Helvetica", 16)).pack(pady=10)
+        
+        tk.Label(self, text="Apple ID Email:").pack(pady=5)
+        self.apple_email_entry = tk.Entry(self, width=40)
+        self.apple_email_entry.pack(pady=5)
+        
+        tk.Button(self, text="Continue", command=self.apple_sign_in).pack(pady=5)
+    
+    def apple_sign_in(self):
+        apple_email = self.apple_email_entry.get().strip()
+        if not apple_email:
+            messagebox.showerror("Error", "Apple Sign In failed. Please try again.")
+            return
+        self.controller.data["email"] = apple_email
+        self.controller.show_frame("ServicesPage")
+
+class ServicesPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        
+        tk.Label(self, text="Select Services", font=("Helvetica", 16)).pack(pady=10)
+        tk.Label(self, text="Choose one or more services:").pack(pady=5)
+        
+        # Dictionary to hold the state of each checkbox
+        self.service_vars = {}
+        for service, price in SERVICES.items():
+            var = tk.IntVar()
+            chk = tk.Checkbutton(self, text=f"{service} - ${price}", variable=var)
+            chk.pack(anchor="w", padx=20)
+            self.service_vars[service] = var
+        
+        tk.Button(self, text="Continue to Appointment", command=self.save_services).pack(pady=10)
+    
+    def save_services(self):
+        selected_services = [service for service, var in self.service_vars.items() if var.get() == 1]
+        if not selected_services:
+            messagebox.showerror("Error", "Please select at least one service.")
+            return
+        self.controller.data["services"] = selected_services
+        self.controller.show_frame("AppointmentPage")
+
+class AppointmentPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+
+        tk.Label(self, text="Appointment Booking", font=("Helvetica", 16)).pack(pady=10)
+        
+        # Date dropdown (generate available dates for the next 7 days)
+        tk.Label(self, text="Select Date:").pack(pady=5)
+        self.date_var = tk.StringVar(self)
+        available_dates = self.generate_dates()
+        self.date_var.set(available_dates[0])
+        self.date_option = tk.OptionMenu(self, self.date_var, *available_dates, command=self.date_changed)
+        self.date_option.pack(pady=5)
+        
+        # Time dropdown (populated based on the selected date)
+        tk.Label(self, text="Select Time:").pack(pady=5)
+        self.time_var = tk.StringVar(self)
+        available_times = self.get_available_times(self.date_var.get())
+        self.time_var.set(available_times[0])
+        self.time_option = tk.OptionMenu(self, self.time_var, *available_times)
+        self.time_option.pack(pady=5)
+        
+        tk.Label(self, text="Select Technician(s) (max 2):").pack(pady=5)
+        self.tech_vars = {}
+        for tech in TECHNICIANS:
+            var = tk.IntVar()
+            chk = tk.Checkbutton(self, text=tech, variable=var)
+            chk.pack(anchor="w", padx=20)
+            self.tech_vars[tech] = var
+        
+        tk.Button(self, text="Continue to Checkout", command=self.save_appointment).pack(pady=10)
+    
+    def generate_dates(self):
+        today = datetime.today()
+        dates = []
+        for i in range(7):  # next 7 days
+            date = today + timedelta(days=i)
+            dates.append(date.strftime("%m/%d/%Y"))
+        return dates
+    
+    def get_available_times(self, date_str):
+        # For simulation, we assume the same available time slots for every day.
+        return ["09:00 AM", "10:00 AM", "11:00 AM", "12:00 PM", "01:00 PM",
+                "02:00 PM", "03:00 PM", "04:00 PM", "05:00 PM"]
+    
+    def date_changed(self, new_date):
+        # When the date is changed, update the available time slots.
+        available_times = self.get_available_times(new_date)
+        self.time_var.set(available_times[0])
+        menu = self.time_option["menu"]
+        menu.delete(0, "end")
+        for time in available_times:
+            menu.add_command(label=time, command=lambda value=time: self.time_var.set(value))
+    
+    def save_appointment(self):
+        date_text = self.date_var.get().strip()
+        time_text = self.time_var.get().strip()
+        
+        if not date_text or not time_text:
+            messagebox.showerror("Error", "Please select a date and time.")
+            return
+        
+        # Simple date validation
+        try:
+            datetime.strptime(date_text, "%m/%d/%Y")
+        except ValueError:
+            messagebox.showerror("Error", "Invalid date format. Please use MM/DD/YYYY.")
+            return
+        
+        # Count selected technicians
+        selected_techs = [tech for tech, var in self.tech_vars.items() if var.get() == 1]
+        if not selected_techs:
+            messagebox.showerror("Error", "Please select at least one technician.")
+            return
+        if len(selected_techs) > 2:
+            messagebox.showerror("Error", "Please select at most 2 technicians.")
+            return
+        
+        self.controller.data["appointment"] = {
+            "date": date_text,
+            "time": time_text,
+            "technicians": selected_techs
+        }
+        self.controller.show_frame("CheckoutPage")
+
+class CheckoutPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        
+        self.summary_label = tk.Label(self, text="Checkout", font=("Helvetica", 16))
+        self.summary_label.pack(pady=10)
+        
+        self.summary_text = tk.Text(self, height=10, width=50)
+        self.summary_text.pack(pady=5)
+        self.summary_text.config(state="disabled")
+        
+        tk.Label(self, text="Tip (optional):").pack(pady=5)
+        self.tip_entry = tk.Entry(self, width=10)
+        self.tip_entry.pack(pady=5)
+        
+        tk.Label(self, text="Promo Code (optional):").pack(pady=5)
+        self.promo_entry = tk.Entry(self, width=20)
+        self.promo_entry.pack(pady=5)
+        
+        # Payment method radiobuttons
+        self.payment_method = tk.StringVar(value="apple_pay")
+        tk.Label(self, text="Select Payment Method:").pack(pady=5)
+        tk.Radiobutton(self, text="Apple Pay", variable=self.payment_method,
+                       value="apple_pay").pack()
+        tk.Radiobutton(self, text="Credit/Debit Card", variable=self.payment_method,
+                       value="credit_card").pack()
+        
+        tk.Button(self, text="Pay Now", command=self.process_checkout).pack(pady=10)
+    
+    def update_summary(self):
+        # Calculate order summary from selected services
+        services = self.controller.data.get("services", [])
+        subtotal = sum(SERVICES[svc] for svc in services)
+        tax = subtotal * 0.06  # 6% tax
+        tip = 0.0
+        try:
+            tip = float(self.tip_entry.get().strip())
+        except ValueError:
+            tip = 0.0
+        total = subtotal + tax + tip
+        
+        summary = "Services:\n"
+        for svc in services:
+            summary += f" - {svc}: ${SERVICES[svc]}\n"
+        summary += f"\nSubtotal: ${subtotal:.2f}"
+        summary += f"\nTax (6%): ${tax:.2f}"
+        summary += f"\nTip: ${tip:.2f}"
+        summary += f"\nTotal: ${total:.2f}"
+        
+        self.summary_text.config(state="normal")
+        self.summary_text.delete("1.0", tk.END)
+        self.summary_text.insert(tk.END, summary)
+        self.summary_text.config(state="disabled")
+        
+        # Save checkout info
+        self.controller.data["checkout"] = {
+            "tip": tip,
+            "promo": self.promo_entry.get().strip(),
+            "payment_method": self.payment_method.get()
+        }
+    
+    def process_checkout(self):
+        self.update_summary()
+        method = self.payment_method.get()
+        if method == "credit_card":
+            self.controller.show_frame("PaymentPage")
+        else:
+            # Simulate immediate Apple Pay success
+            self.controller.show_frame("ConfirmationPage")
+    
+    def tkraise(self, *args, **kwargs):
+        # Update summary when the page is shown
+        super().tkraise(*args, **kwargs)
+        self.update_summary()
+
+class PaymentPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        
+        tk.Label(self, text="Enter Payment Details", font=("Helvetica", 16)).pack(pady=10)
+        
+        tk.Label(self, text="Cardholder First Name:").pack(pady=5)
+        self.first_name = tk.Entry(self, width=30)
+        self.first_name.pack(pady=5)
+        
+        tk.Label(self, text="Cardholder Last Name:").pack(pady=5)
+        self.last_name = tk.Entry(self, width=30)
+        self.last_name.pack(pady=5)
+        
+        tk.Label(self, text="Card Number:").pack(pady=5)
+        self.card_number = tk.Entry(self, width=30)
+        self.card_number.pack(pady=5)
+        
+        tk.Label(self, text="Expiry Date (MM/YYYY):").pack(pady=5)
+        self.expiry = tk.Entry(self, width=15)
+        self.expiry.pack(pady=5)
+        
+        tk.Label(self, text="CVV:").pack(pady=5)
+        self.cvv = tk.Entry(self, width=10, show="*")
+        self.cvv.pack(pady=5)
+        
+        tk.Button(self, text="Confirm Payment", command=self.confirm_payment).pack(pady=10)
+    
+    def confirm_payment(self):
+        first = self.first_name.get().strip()
+        last = self.last_name.get().strip()
+        card = self.card_number.get().strip()
+        expiry = self.expiry.get().strip()
+        cvv = self.cvv.get().strip()
+        
+        if not all([first, last, card, expiry, cvv]):
+            messagebox.showerror("Error", "All payment fields are required.")
+            return
+        
+        if not card.isdigit() or not (13 <= len(card) <= 19):
+            messagebox.showerror("Error", "Invalid card number.")
+            return
+        
+        # Check expiry format and if card is expired (using MM/YYYY)
+        try:
+            exp_date = datetime.strptime(expiry, "%m/%Y")
+            if exp_date < datetime.now():
+                messagebox.showerror("Error", "Card is expired.")
+                return
+        except ValueError:
+            messagebox.showerror("Error", "Invalid expiry date format. Use MM/YYYY.")
+            return
+        
+        if not cvv.isdigit() or len(cvv) not in (3,4):
+            messagebox.showerror("Error", "Invalid CVV.")
+            return
+        
+        # Save (simulated) payment info (store only last 4 digits)
+        self.controller.data["payment"] = {
+            "first_name": first,
+            "last_name": last,
+            "card_number": card[-4:],
+            "expiry": expiry
+        }
+        self.controller.show_frame("ConfirmationPage")
+
+class ConfirmationPage(tk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+        self.controller = controller
+        self.label = tk.Label(self, text="Booking Confirmation", font=("Helvetica", 16))
+        self.label.pack(pady=10)
+        self.details = tk.Text(self, height=15, width=50)
+        self.details.pack(pady=5)
+        self.details.config(state="disabled")
+        tk.Button(self, text="Exit", command=self.quit_app).pack(pady=10)
+    
+    def update_confirmation(self):
+        email = self.controller.data.get("email", "Unknown")
+        services = self.controller.data.get("services", [])
+        appointment = self.controller.data.get("appointment", {})
+        checkout = self.controller.data.get("checkout", {})
+        payment = self.controller.data.get("payment", None)
+        
+        subtotal = sum(SERVICES[svc] for svc in services)
+        tax = subtotal * 0.06
+        tip = checkout.get("tip", 0)
+        total = subtotal + tax + tip
+        
+        conf_str = f"Thank you, {email}! Your appointment is confirmed.\n\n"
+        conf_str += "Appointment Details:\n"
+        conf_str += f"  Date: {appointment.get('date', '')}\n"
+        conf_str += f"  Time: {appointment.get('time', '')}\n"
+        techs = appointment.get("technicians", [])
+        conf_str += f"  Technicians: {', '.join(techs)}\n\n"
+        conf_str += "Services Booked:\n"
+        for svc in services:
+            conf_str += f"  {svc} - ${SERVICES[svc]}\n"
+        conf_str += f"\nSubtotal: ${subtotal:.2f}\n"
+        conf_str += f"Tax (6%): ${tax:.2f}\n"
+        conf_str += f"Tip: ${tip:.2f}\n"
+        conf_str += f"Total: ${total:.2f}\n\n"
+        if payment:
+            conf_str += f"Payment: Credit/Debit Card ending in {payment['card_number']}\n"
+        else:
+            conf_str += "Payment: Apple Pay\n"
+        conf_str += "\n✓ Payment Successful\nYou may now exit this window."
+        
+        self.details.config(state="normal")
+        self.details.delete("1.0", tk.END)
+        self.details.insert(tk.END, conf_str)
+        self.details.config(state="disabled")
+    
+    def tkraise(self, *args, **kwargs):
+        # Update confirmation details when shown.
+        super().tkraise(*args, **kwargs)
+        self.update_confirmation()
+    
+    def quit_app(self):
+        self.controller.destroy()
+
+if __name__ == "__main__":
+    app = PoshNailsApp()
+    app.mainloop()
