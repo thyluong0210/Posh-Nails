@@ -1,11 +1,17 @@
 '''
 To tun the code you'll have to follow this instruction:
-Step 1: downlad apple.jpg, google.jpg, poshnails.jpg, tick.jp. PLace them in your desktop
-Step 2: create a folder with all the images in your desktop.
-Step 3: open VS code in your computer.
-Step 4: in VS code click on the "Explorer" button, and then click on the "Open Folder" button
-Step 5: select the folder that contains all the images
-Step 6: create a new python file in VS code
-Step 7: copy and paste the "Final.Code" code in VS Studio
-Step 8: click "Run"
+Step 1: Download the zip file named “Posh Nails”
+This zip file has our python file and the images we used in our code. In order for the code to run, the python file and the images have to be in the same folder. 
+Step 2: Extract the zip file to a folder
+Right click on the zip file and select “Extract all”. Then a box should pop up. Select browse and select where you want to store this folder on your computer. 
+Step 3: Open Posh Nails python file
+It’s the only Python Source File in the folder. The other ones are JPG files.
+Step 4: In VS code, select “Explorer” on your upper left corner. Then select the “New Folder” button. Browse to find the Posh Nails folder in your computer. 
+Click posh nails.py to open the code and click the play button to run it.
+Step 5: Select one of the three available sign in methods in the file that pops up once you run the code
+Step 6: Select at least one service
+Step 7: Select appointment date, time, and technicians
+Step 8: View your appointment info, payment amount, enter Tip amount and Promo code, and select payment method. Then click “Pay now” to proceed.
+Step 9: View your booking confirmation. You are all set! Click “Exit”.
+
 '''
